@@ -1,0 +1,56 @@
+#!/bin/sh
+set -eu
+
+root="$(cd "$(dirname "$0")/.." && pwd)"
+known_hosts="$root/terraform/.known_hosts"
+
+tf() { terraform -chdir="$root/terraform" "$@"; }
+ip() { tf output -raw ip; }
+# Each new VM brings a new host key on the same floating IP, so `up` resets this file.
+remote() { ssh -o ConnectTimeout=10 -o UserKnownHostsFile="$known_hosts" -o StrictHostKeyChecking=accept-new "ubuntu@$(ip)" "$@"; }
+
+wait_for_bootstrap() {
+  i=0
+  until remote true 2>/dev/null; do
+    i=$((i + 1)); [ "$i" -lt 60 ] || { echo "ssh never answered" >&2; exit 1; }
+    sleep 5
+  done
+  # Exit 2 means cloud-init finished with warnings only.
+  rc=0; remote cloud-init status --wait || rc=$?
+  [ "$rc" -le 2 ] || { remote sudo tail -n 40 /var/log/cloud-init-output.log; exit 1; }
+}
+
+usage() {
+  cat >&2 <<'EOF'
+usage: t3env <command>
+  up        create or resume the VM (keeps the data volume)
+  connect   wait for bootstrap, then sign the VM into T3 Connect
+  auth      read a Claude token (`claude setup-token`) from stdin and give it to the VM's T3
+  ssh      open a shell on the VM
+  status    show Terraform outputs and the VM's T3 status
+  down      delete the VM, keep the volume, floating IP and key pair
+  destroy   delete everything, the data volume included
+EOF
+  exit 2
+}
+
+case "${1:-}" in
+  up) tf init -input=false >/dev/null && tf apply -var running=true && rm -f "$known_hosts" ;;
+  down) tf apply -var running=false ;;
+  connect)
+    wait_for_bootstrap
+    remote -t '$HOME/.local/bin/t3 up --connect --headless'
+    echo "VM is on T3 Connect. Link it from local T3: Settings > Environments > Linked environments, or ask an agent to link \"nipa\"." >&2
+    ;;
+  auth)
+    [ ! -t 0 ] || { echo "pipe the token in: op read ... | t3env auth" >&2; exit 2; }
+    token="$(tr -d '[:space:]')"
+    [ -n "$token" ] || { echo "empty token" >&2; exit 2; }
+    printf 'CLAUDE_CODE_OAUTH_TOKEN=%s\n' "$token" |
+      remote 'umask 077 && cat > "$HOME/.t3/provider.env" && systemctl --user daemon-reload && systemctl --user try-restart t3code.service'
+    ;;
+  ssh) shift; remote -t "$@" ;;
+  status) tf output && remote '$HOME/.local/bin/t3 status' ;;
+  destroy) tf destroy ;;
+  *) usage ;;
+esac
