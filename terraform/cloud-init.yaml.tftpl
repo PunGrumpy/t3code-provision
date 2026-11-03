@@ -59,7 +59,7 @@ write_files:
       install_once t3 https://t3.codes/install.sh
       install_once claude https://claude.ai/install.sh
       # The unit lives on the root disk, so a recreated VM needs it again. T3 Connect's sign-in is
-      # on the volume, so a reused volume comes back reachable without `connect`.
+      # on the volume, which should bring a reused volume back without `connect` (untested on a new VM).
       export XDG_RUNTIME_DIR="/run/user/$(id -u)"
       i=0
       until [ -S "$XDG_RUNTIME_DIR/bus" ]; do

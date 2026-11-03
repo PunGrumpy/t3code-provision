@@ -20,7 +20,7 @@ Terraform for one NIPA Cloud VM that runs T3 Code as a linked environment, so ag
 
 ```sh
 bin/t3env up                       # create or resume the VM
-bin/t3env connect                  # wait for cloud-init, then sign the VM into T3 Connect (URL + code, once per volume)
+bin/t3env connect                  # wait for cloud-init, then sign the VM into T3 Connect (URL + code; rerun after `up` if the VM is unreachable)
 op read op://vault/claude/token | bin/t3env auth   # give the VM's T3 a Claude token, once per volume
 bin/t3env down                     # delete the VM, keep volume, IP and key pair (stops compute billing)
 bin/t3env destroy                  # delete everything, including the data volume
