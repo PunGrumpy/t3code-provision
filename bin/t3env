@@ -2,9 +2,7 @@
 set -eu
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
-known_hosts="$root/terraform/.known_hosts"
 
-tf() { terraform -chdir="$root/terraform" "$@"; }
 ip() { tf output -raw ip; }
 # Each new VM brings a new host key on the same floating IP, so `up` resets this file.
 remote() { ssh -o ConnectTimeout=10 -o UserKnownHostsFile="$known_hosts" -o StrictHostKeyChecking=accept-new "ubuntu@$(ip)" "$@"; }
@@ -21,12 +19,14 @@ wait_for_bootstrap() {
 }
 
 usage() {
+  echo "usage: t3env <cloud> <command>" >&2
+  echo "clouds: $(cd "$root/clouds" && echo *)" >&2
   cat >&2 <<'EOF'
-usage: t3env <command>
+commands:
   up        create or resume the VM (keeps the data volume)
   connect   wait for bootstrap, then sign the VM into T3 Connect
   auth      read a Claude token (`claude setup-token`) from stdin and give it to the VM's T3
-  ssh      open a shell on the VM
+  ssh       open a shell on the VM
   status    show Terraform outputs and the VM's T3 status
   down      delete the VM, keep the volume, floating IP and key pair
   destroy   delete everything, the data volume included
@@ -34,7 +34,13 @@ EOF
   exit 2
 }
 
-case "${1:-}" in
+[ $# -ge 2 ] && [ -d "$root/clouds/$1" ] || usage
+dir="$root/clouds/$1"
+shift
+known_hosts="$dir/.known_hosts"
+tf() { terraform -chdir="$dir" "$@"; }
+
+case "$1" in
   up) tf init -input=false >/dev/null && tf apply -var running=true && rm -f "$known_hosts" ;;
   down) tf apply -var running=false ;;
   connect)

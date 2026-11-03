@@ -1,29 +1,32 @@
 # t3code-provision
 
-Terraform for one NIPA Cloud VM that runs T3 Code as a linked environment, so agents on your laptop can delegate builds and tests to it.
+Terraform for one cloud VM that runs T3 Code as a linked environment, so agents on your laptop can delegate builds and tests to it.
 
 ## Layout
 
-- `terraform/` holds the VM, a persistent data volume, a floating IP, a key pair and an SSH-only security group.
-- `terraform/cloud-init.yaml.tftpl` mounts the volume at `/srv/t3`, links `~/.t3`, `~/.claude`, `~/.codex`, `~/.config/gh` and `~/workspace` into it, installs `t3`, Claude Code and Docker, and writes the two files below.
+- `modules/bootstrap` renders the cloud-init every cloud shares. Its one cloud-specific input is the data volume's `/dev/disk/by-*` path inside the guest.
+- `clouds/<name>` is one Terraform root per provider: the VM, a persistent data volume, a public IP, a key pair and an SSH-only firewall. `clouds/nipa` is NIPA Cloud on OpenStack.
+- The cloud-init mounts the volume at `/srv/t3`, links `~/.t3`, `~/.claude`, `~/.codex`, `~/.config/gh` and `~/workspace` into it, installs `t3`, Claude Code and Docker, and writes the two files below.
 - `/etc/t3code/policy.json` is a T3 Code managed policy that turns on Linked environments. Without it the VM refuses every link until someone flips Settings > Labs for it.
 - `~/.config/systemd/user/t3code.service.d/provider-env.conf` loads `~/.t3/provider.env` into the T3 service. `t3 up` rewrites the service unit, so the credentials ride in a drop-in instead.
 - `bin/t3env` wraps the lifecycle.
 
 ## Prerequisites
 
+For `clouds/nipa`:
+
 - A working `ncp-devops` entry in `~/.config/openstack/clouds.yaml` with its application credential in `secure.yaml`. Terraform reads it through `cloud = "ncp-devops"`, so no secret goes into tfvars or state. Check it with `OS_CLOUD=ncp-devops openstack token issue`.
-- `terraform/terraform.tfvars`, copied from the example, with real image, network and floating IP pool names from `openstack image list`, `openstack network list` and `openstack network list --external`.
+- `clouds/nipa/terraform.tfvars`, copied from the example, with real image, network and floating IP pool names from `openstack image list`, `openstack network list` and `openstack network list --external`.
 - `t3_channel` set to the release train of the machine you link from (`t3 --version` there). It defaults to `stable`.
 
 ## Lifecycle
 
 ```sh
-bin/t3env up                       # create or resume the VM
-bin/t3env connect                  # wait for cloud-init, then sign the VM into T3 Connect (URL + code; rerun after `up` if the VM is unreachable)
-op read op://vault/claude/token | bin/t3env auth   # give the VM's T3 a Claude token, once per volume
-bin/t3env down                     # delete the VM, keep volume, IP and key pair (stops compute billing)
-bin/t3env destroy                  # delete everything, including the data volume
+bin/t3env nipa up                       # create or resume the VM
+bin/t3env nipa connect                  # wait for cloud-init, then sign the VM into T3 Connect (URL + code; rerun after `up` if the VM is unreachable)
+op read op://vault/claude/token | bin/t3env nipa auth   # give the VM's T3 a Claude token, once per volume
+bin/t3env nipa down                     # delete the VM, keep volume, IP and key pair (stops compute billing)
+bin/t3env nipa destroy                  # delete everything, including the data volume
 ```
 
 Make the token with `claude setup-token` on a machine with a browser. `auth` reads it from stdin, so it stays out of shell history, tfvars, user_data and Terraform state, and writes it to `~/.t3/provider.env` with mode 0600 on the volume.
@@ -36,6 +39,10 @@ After `down` and `up`, cloud-init reinstalls the T3 service from the volume's si
 
 - Every process T3 starts inherits `CLAUDE_CODE_OAUTH_TOKEN`, including the builds and tests of the repos you delegate, and `ubuntu` is in the `docker` group. Run only repos you trust here, and revoke the token from your Claude account if the VM is compromised.
 - `up` forgets the VM's SSH host key and trusts the first one it sees, because each new VM brings a new key on the same floating IP. Compare it with `openstack console log show` if the network path is not yours.
+
+## Tests
+
+`terraform test` in `modules/bootstrap` checks that the cloud-init is valid YAML with a valid policy JSON, formats only the disk it was given, and keeps `partition: auto`. Each cloud's `tests/` runs the root against a mock provider and checks the device path cloud-init receives. CI runs `fmt`, `validate` and `test` for every directory under `modules/` and `clouds/`.
 
 ## Verified
 

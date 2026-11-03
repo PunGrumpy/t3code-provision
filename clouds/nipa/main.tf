@@ -45,6 +45,14 @@ resource "openstack_networking_port_v2" "this" {
   security_group_ids = [openstack_networking_secgroup_v2.this.id]
 }
 
+module "bootstrap" {
+  source = "../../modules/bootstrap"
+  # Nova exposes an attached Cinder volume under its id, truncated to the virtio serial length.
+  data_device         = "/dev/disk/by-id/virtio-${substr(openstack_blockstorage_volume_v3.data.id, 0, 20)}"
+  t3_channel          = var.t3_channel
+  policy_organization = var.policy_organization
+}
+
 resource "openstack_compute_instance_v2" "worker" {
   count             = var.running ? 1 : 0
   name              = var.name
@@ -52,12 +60,7 @@ resource "openstack_compute_instance_v2" "worker" {
   key_pair          = openstack_compute_keypair_v2.this.name
   availability_zone = var.availability_zone
 
-  user_data = templatefile("${path.module}/cloud-init.yaml.tftpl", {
-    # Nova exposes an attached Cinder volume under its id, truncated to the virtio serial length.
-    data_device         = "/dev/disk/by-id/virtio-${substr(openstack_blockstorage_volume_v3.data.id, 0, 20)}"
-    t3_channel          = var.t3_channel
-    policy_organization = var.policy_organization
-  })
+  user_data = module.bootstrap.user_data
 
   network {
     port = openstack_networking_port_v2.this[0].id
