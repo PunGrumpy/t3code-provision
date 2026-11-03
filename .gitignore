@@ -4,4 +4,4 @@
 *.tfvars
 !*.tfvars.example
 crash.log
-terraform/.known_hosts
+clouds/*/.known_hosts

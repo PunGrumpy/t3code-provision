@@ -8,10 +8,6 @@ variable "t3_channel" {
   description = "T3 Code release train. Match the machine you link from."
   type        = string
   default     = "stable"
-  validation {
-    condition     = contains(["stable", "nightly", "preview"], var.t3_channel)
-    error_message = "t3_channel must be stable, nightly or preview."
-  }
 }
 
 variable "policy_organization" {
