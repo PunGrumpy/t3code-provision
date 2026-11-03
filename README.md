@@ -30,9 +30,19 @@ Make the token with `claude setup-token` on a machine with a browser. `auth` rea
 
 After `connect`, link the VM from your local T3 Code in Settings > Environments > Linked environments, or with `t3 environment link <address> --pairing-code <code> --access <mode>`, taking the code from `t3 pair` on the VM.
 
+After `down` and `up`, cloud-init reinstalls the T3 service from the volume's sign-in, so the VM comes back on the same T3 Connect address without `connect` or `auth`.
+
+## Security
+
+- Every process T3 starts inherits `CLAUDE_CODE_OAUTH_TOKEN`, including the builds and tests of the repos you delegate, and `ubuntu` is in the `docker` group. Run only repos you trust here, and revoke the token from your Claude account if the VM is compromised.
+- `up` forgets the VM's SSH host key and trusts the first one it sees, because each new VM brings a new key on the same floating IP. Compare it with `openstack console log show` if the network path is not yours.
+
 ## Verified
 
-On an existing Ubuntu 24.04 VM with T3 Code 0.1.7-nightly, set up by hand with the same files:
+On an existing Ubuntu 24.04 VM with T3 Code 0.1.7-nightly and cloud-init 26.1, set up by hand with the same files:
+
+- cloud-init's own `mkfs` against a loop device: with `partition: none` a second instance erased the data, and with `partition: auto` the data survived.
+- After `t3 service uninstall`, `t3 service install` from a non-login shell with `XDG_RUNTIME_DIR` set brought T3 Connect back on the same address with no `t3 up`.
 
 - `t3 policy show` reports the policy loaded, and a laptop links the VM with no `settings.json` on it.
 - The drop-in survives `t3 up --connect --yes`, and a variable in `provider.env` reaches the T3 server process and its children.

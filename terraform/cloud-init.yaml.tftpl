@@ -11,11 +11,12 @@ packages:
   - unzip
 
 fs_setup:
+  # fs_setup runs on every new instance. `none` formats the raw disk each time; `auto` reuses an
+  # ext4 labelled t3data and formats only a blank disk.
   - device: ${data_device}
-    partition: none
+    partition: auto
     filesystem: ext4
     label: t3data
-    overwrite: false
 
 mounts:
   - [LABEL=t3data, /srv/t3, ext4, "defaults,nofail", "0", "2"]
@@ -27,7 +28,7 @@ write_files:
     content: |
       {
         "schemaVersion": 1,
-        "organization": "${policy_organization}",
+        "organization": ${jsonencode(policy_organization)},
         "settings": {
           "linkedEnvironmentsEnabled": { "value": true, "locked": false }
         }
@@ -57,6 +58,15 @@ write_files:
       export T3CODE_CHANNEL=${t3_channel}
       install_once t3 https://t3.codes/install.sh
       install_once claude https://claude.ai/install.sh
+      # The unit lives on the root disk, so a recreated VM needs it again. T3 Connect's sign-in is
+      # on the volume, so a reused volume comes back reachable without `connect`.
+      export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+      i=0
+      until [ -S "$XDG_RUNTIME_DIR/bus" ]; do
+        i=$((i + 1)); [ "$i" -lt 30 ] || { echo "user systemd never started" >&2; exit 1; }
+        sleep 1
+      done
+      "$HOME/.local/bin/t3" service install
 
 runcmd:
   - mountpoint -q /srv/t3 || { echo "t3 data volume not mounted" >&2; exit 1; }

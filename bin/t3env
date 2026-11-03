@@ -7,11 +7,11 @@ known_hosts="$root/terraform/.known_hosts"
 tf() { terraform -chdir="$root/terraform" "$@"; }
 ip() { tf output -raw ip; }
 # Each new VM brings a new host key on the same floating IP, so `up` resets this file.
-remote() { ssh -o UserKnownHostsFile="$known_hosts" -o StrictHostKeyChecking=accept-new "ubuntu@$(ip)" "$@"; }
+remote() { ssh -o ConnectTimeout=10 -o UserKnownHostsFile="$known_hosts" -o StrictHostKeyChecking=accept-new "ubuntu@$(ip)" "$@"; }
 
 wait_for_bootstrap() {
   i=0
-  until remote -o ConnectTimeout=5 true 2>/dev/null; do
+  until remote true 2>/dev/null; do
     i=$((i + 1)); [ "$i" -lt 60 ] || { echo "ssh never answered" >&2; exit 1; }
     sleep 5
   done
@@ -47,7 +47,7 @@ case "${1:-}" in
     token="$(tr -d '[:space:]')"
     [ -n "$token" ] || { echo "empty token" >&2; exit 2; }
     printf 'CLAUDE_CODE_OAUTH_TOKEN=%s\n' "$token" |
-      remote 'umask 077 && cat > "$HOME/.t3/provider.env" && systemctl --user daemon-reload && systemctl --user restart t3code.service'
+      remote 'umask 077 && cat > "$HOME/.t3/provider.env" && systemctl --user daemon-reload && systemctl --user try-restart t3code.service'
     ;;
   ssh) shift; remote -t "$@" ;;
   status) tf output && remote '$HOME/.local/bin/t3 status' ;;
