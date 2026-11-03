@@ -18,6 +18,16 @@ run "renders_valid_cloud_config" {
   }
 
   assert {
+    condition     = strcontains(yamldecode(output.user_data).bootcmd[0], "[ -e ${var.data_device} ]")
+    error_message = "bootcmd must wait for the same disk fs_setup formats"
+  }
+
+  assert {
+    condition     = yamldecode(output.user_data).users == ["default"]
+    error_message = "without the default user, su -l ubuntu and t3env ssh fail on root-login images"
+  }
+
+  assert {
     condition     = yamldecode(output.user_data).fs_setup[0].partition == "auto"
     error_message = "partition must stay auto, or every new instance reformats the data volume"
   }

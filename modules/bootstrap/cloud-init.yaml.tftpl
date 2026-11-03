@@ -1,6 +1,14 @@
 #cloud-config
 package_update: true
 
+# Some images (Hetzner's) log in as root. The bootstrap and t3env expect the distro's default user.
+users:
+  - default
+
+bootcmd:
+  # Hetzner and AWS attach the volume after the server starts, so disk_setup could miss it.
+  - i=0; until [ -e ${data_device} ] || [ "$i" -ge 300 ]; do i=$((i + 1)); sleep 1; done
+
 packages:
   - build-essential
   - curl
