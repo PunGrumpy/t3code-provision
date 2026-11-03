@@ -34,8 +34,11 @@ EOF
   exit 2
 }
 
-[ $# -ge 2 ] && [ -d "$root/clouds/$1" ] || usage
-dir="$root/clouds/$1"
+[ $# -ge 2 ] || usage
+case "$1" in .* | */*) usage ;; esac
+cloud="$1"
+dir="$root/clouds/$cloud"
+[ -f "$dir/versions.tf" ] || usage
 shift
 known_hosts="$dir/.known_hosts"
 tf() { terraform -chdir="$dir" "$@"; }
@@ -46,10 +49,10 @@ case "$1" in
   connect)
     wait_for_bootstrap
     remote -t '$HOME/.local/bin/t3 up --connect --headless'
-    echo "VM is on T3 Connect. Link it from local T3: Settings > Environments > Linked environments, or ask an agent to link \"nipa\"." >&2
+    echo "VM is on T3 Connect. Link it from local T3: Settings > Environments > Linked environments, or ask an agent to link \"$cloud\"." >&2
     ;;
   auth)
-    [ ! -t 0 ] || { echo "pipe the token in: op read ... | t3env auth" >&2; exit 2; }
+    [ ! -t 0 ] || { echo "pipe the token in: op read ... | t3env $cloud auth" >&2; exit 2; }
     token="$(tr -d '[:space:]')"
     [ -n "$token" ] || { echo "empty token" >&2; exit 2; }
     printf 'CLAUDE_CODE_OAUTH_TOKEN=%s\n' "$token" |
