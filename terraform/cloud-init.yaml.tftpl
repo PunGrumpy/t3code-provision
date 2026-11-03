@@ -1,0 +1,66 @@
+#cloud-config
+package_update: true
+
+packages:
+  - build-essential
+  - curl
+  - docker.io
+  - git
+  - jq
+  - tmux
+  - unzip
+
+fs_setup:
+  - device: ${data_device}
+    partition: none
+    filesystem: ext4
+    label: t3data
+    overwrite: false
+
+mounts:
+  - [LABEL=t3data, /srv/t3, ext4, "defaults,nofail", "0", "2"]
+
+write_files:
+  # A link to this VM is refused until Linked environments is on here.
+  - path: /etc/t3code/policy.json
+    permissions: "0644"
+    content: |
+      {
+        "schemaVersion": 1,
+        "organization": "${policy_organization}",
+        "settings": {
+          "linkedEnvironmentsEnabled": { "value": true, "locked": false }
+        }
+      }
+  - path: /usr/local/lib/t3-bootstrap.sh
+    permissions: "0755"
+    content: |
+      #!/bin/sh
+      set -eu
+      for d in .t3 .claude .codex .config/gh workspace; do
+        mkdir -p "/srv/t3/$d" "$(dirname "$HOME/$d")"
+        [ -L "$HOME/$d" ] || { rm -rf "$HOME/$d"; ln -s "/srv/t3/$d" "$HOME/$d"; }
+      done
+      # Claude Code keeps .claude.json inside CLAUDE_CONFIG_DIR, so its login stays on the volume.
+      mkdir -p "$HOME/.config/environment.d"
+      echo "CLAUDE_CONFIG_DIR=$HOME/.claude" > "$HOME/.config/environment.d/claude.conf"
+      grep -q CLAUDE_CONFIG_DIR "$HOME/.profile" || echo "export CLAUDE_CONFIG_DIR=\$HOME/.claude" >> "$HOME/.profile"
+      # `t3 up` rewrites t3code.service, so provider credentials ride in a drop-in. The env file
+      # sits on the volume and is written by `t3env auth`, never by user_data.
+      mkdir -p "$HOME/.config/systemd/user/t3code.service.d"
+      printf '[Service]\nEnvironmentFile=-%%h/.t3/provider.env\n' > "$HOME/.config/systemd/user/t3code.service.d/provider-env.conf"
+      install_once() {
+        [ -x "$HOME/.local/bin/$1" ] && return
+        curl -fsSL -o "/tmp/install-$1.sh" "$2"
+        bash "/tmp/install-$1.sh"
+      }
+      export T3CODE_CHANNEL=${t3_channel}
+      install_once t3 https://t3.codes/install.sh
+      install_once claude https://claude.ai/install.sh
+
+runcmd:
+  - mountpoint -q /srv/t3 || { echo "t3 data volume not mounted" >&2; exit 1; }
+  - chown ubuntu:ubuntu /srv/t3
+  - usermod -aG docker ubuntu
+  - loginctl enable-linger ubuntu
+  - [su, -l, ubuntu, -c, /usr/local/lib/t3-bootstrap.sh]

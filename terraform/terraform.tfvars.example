@@ -1,0 +1,5 @@
+# Copy to terraform.tfvars. Look the names up with `OS_CLOUD=ncp-devops openstack image|network list`.
+image_name       = "Ubuntu-24.04"
+network_name     = "default"
+floating_ip_pool = "public"
+ssh_cidrs        = ["203.0.113.10/32"]
