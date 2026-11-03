@@ -73,4 +73,7 @@ runcmd:
   - chown ubuntu:ubuntu /srv/t3
   - usermod -aG docker ubuntu
   - loginctl enable-linger ubuntu
+  # An SSH login during boot starts the user manager before usermod, and the T3 service would
+  # inherit its group list without docker until the next reboot.
+  - systemctl restart "user@$(id -u ubuntu).service"
   - [su, -l, ubuntu, -c, /usr/local/lib/t3-bootstrap.sh]

@@ -30,7 +30,7 @@ Make the token with `claude setup-token` on a machine with a browser. `auth` rea
 
 After `connect`, link the VM from your local T3 Code in Settings > Environments > Linked environments, or with `t3 environment link <address> --pairing-code <code> --access <mode>`, taking the code from `t3 pair` on the VM.
 
-After `down` and `up`, cloud-init reinstalls the T3 service from the volume's sign-in, so the VM comes back on the same T3 Connect address without `connect` or `auth`.
+After `down` and `up`, cloud-init reinstalls the T3 service from the volume's sign-in. The VM should come back on the same T3 Connect address without `connect` or `auth`, but that is only tested on the same machine (see below).
 
 ## Security
 
@@ -42,6 +42,7 @@ After `down` and `up`, cloud-init reinstalls the T3 service from the volume's si
 On an existing Ubuntu 24.04 VM with T3 Code 0.1.7-nightly and cloud-init 26.1, set up by hand with the same files:
 
 - cloud-init's own `mkfs` against a loop device: with `partition: none` a second instance erased the data, and with `partition: auto` the data survived.
+- A user manager started before `usermod -aG` keeps the old group list, and `systemctl restart user@<uid>.service` picks up the new group, checked with `systemd-run --user id -Gn`.
 - After `t3 service uninstall`, `t3 service install` from a non-login shell with `XDG_RUNTIME_DIR` set brought T3 Connect back on the same address with no `t3 up`.
 
 - `t3 policy show` reports the policy loaded, and a laptop links the VM with no `settings.json` on it.
@@ -50,6 +51,8 @@ On an existing Ubuntu 24.04 VM with T3 Code 0.1.7-nightly and cloud-init 26.1, s
 - With only `CLAUDE_CODE_OAUTH_TOKEN` in `provider.env` (`claude auth status` on the VM still says `loggedIn: false`), the VM's Claude provider reports it can run tasks, and a task delegated from the laptop ran `hostname` on the VM.
 
 ## Not verified yet
+
+- A recreated VM reusing the volume's T3 Connect sign-in. The test reinstalled the service on the same machine, with the same machine-id and host key.
 
 - Flavor `csa.xlarge.v2` and zone `NCP-BKK` come from NIPA's public pages, not from the API.
 - No `plan` or `apply` has run against NIPA, because the `ncp-devops` credential returns 401.
