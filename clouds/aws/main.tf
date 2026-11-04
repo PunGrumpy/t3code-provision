@@ -1,3 +1,7 @@
+locals {
+  availability_zone = coalesce(var.availability_zone, "${var.region}a")
+}
+
 data "aws_ami" "ubuntu" {
   most_recent = true
   owners      = ["099720109477"] # Canonical
@@ -9,7 +13,7 @@ data "aws_ami" "ubuntu" {
 }
 
 data "aws_subnet" "this" {
-  availability_zone = var.availability_zone
+  availability_zone = local.availability_zone
   default_for_az    = true
 }
 
@@ -39,7 +43,7 @@ resource "aws_vpc_security_group_egress_rule" "all" {
 }
 
 resource "aws_ebs_volume" "data" {
-  availability_zone = var.availability_zone
+  availability_zone = local.availability_zone
   size              = var.data_gb
   type              = "gp3"
   tags              = { Name = "${var.name}-data" }
@@ -51,6 +55,7 @@ module "bootstrap" {
   data_device         = "/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_${replace(aws_ebs_volume.data.id, "-", "")}"
   t3_channel          = var.t3_channel
   policy_organization = var.policy_organization
+  ssh_public_key      = file(pathexpand(var.ssh_public_key_path))
 }
 
 resource "aws_instance" "worker" {

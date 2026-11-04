@@ -1,9 +1,16 @@
 #cloud-config
 package_update: true
 
-# Some images (Hetzner's) log in as root. The bootstrap and t3env expect the distro's default user.
+# Hetzner's image has no default user, and the bootstrap and t3env need ubuntu. Where ubuntu is
+# already the default user, cloud-init keeps the account and adds the key.
 users:
   - default
+  - name: ubuntu
+    shell: /bin/bash
+    groups: [sudo]
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    ssh_authorized_keys:
+      - ${jsonencode(ssh_public_key)}
 
 bootcmd:
   # Hetzner and AWS attach the volume after the server starts, so disk_setup could miss it.

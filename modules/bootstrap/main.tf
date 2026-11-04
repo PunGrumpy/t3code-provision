@@ -16,6 +16,11 @@ variable "t3_channel" {
   }
 }
 
+variable "ssh_public_key" {
+  description = "Key for the ubuntu user, which t3env logs in as."
+  type        = string
+}
+
 variable "policy_organization" {
   description = "Name T3 Code shows beside settings this VM's managed policy sets."
   type        = string
@@ -26,5 +31,6 @@ output "user_data" {
     data_device         = var.data_device
     t3_channel          = var.t3_channel
     policy_organization = var.policy_organization
+    ssh_public_key      = trimspace(var.ssh_public_key)
   })
 }

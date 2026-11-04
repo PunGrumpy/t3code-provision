@@ -25,6 +25,7 @@ module "bootstrap" {
   data_device         = hcloud_volume.data.linux_device
   t3_channel          = var.t3_channel
   policy_organization = var.policy_organization
+  ssh_public_key      = file(pathexpand(var.ssh_public_key_path))
 }
 
 resource "hcloud_server" "worker" {

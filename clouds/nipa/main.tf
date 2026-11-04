@@ -51,6 +51,7 @@ module "bootstrap" {
   data_device         = "/dev/disk/by-id/virtio-${substr(openstack_blockstorage_volume_v3.data.id, 0, 20)}"
   t3_channel          = var.t3_channel
   policy_organization = var.policy_organization
+  ssh_public_key      = file(pathexpand(var.ssh_public_key_path))
 }
 
 resource "openstack_compute_instance_v2" "worker" {

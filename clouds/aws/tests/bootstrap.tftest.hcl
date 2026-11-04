@@ -31,6 +31,18 @@ run "vm_formats_the_attached_volume" {
   }
 }
 
+run "instance_can_reach_the_internet" {
+  assert {
+    condition     = aws_vpc_security_group_egress_rule.all.ip_protocol == "-1" && aws_vpc_security_group_egress_rule.all.cidr_ipv4 == "0.0.0.0/0"
+    error_message = "Terraform drops AWS's default egress rule, so without this one apt, the installers and the T3 relay cannot connect"
+  }
+
+  assert {
+    condition     = aws_ebs_volume.data.availability_zone == "ap-southeast-1a"
+    error_message = "the volume zone must follow the region when availability_zone is unset"
+  }
+}
+
 run "down_keeps_the_volume" {
   variables {
     running = false

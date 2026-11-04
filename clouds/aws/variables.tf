@@ -27,9 +27,9 @@ variable "region" {
 }
 
 variable "availability_zone" {
-  description = "The EBS volume lives in one zone, so the instance must too."
+  description = "The EBS volume lives in one zone, so the instance must too. Defaults to the region's zone a."
   type        = string
-  default     = "ap-southeast-1a"
+  default     = null
 }
 
 variable "instance_type" {
