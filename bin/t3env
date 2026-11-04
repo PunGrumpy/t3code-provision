@@ -4,7 +4,7 @@ set -eu
 root="$(cd "$(dirname "$0")/.." && pwd)"
 
 ip() { tf output -raw ip; }
-# Each new VM brings a new host key on the same floating IP, so `up` resets this file.
+# Each new VM brings a new host key, so `up` resets this file.
 remote() { ssh -o ConnectTimeout=10 -o UserKnownHostsFile="$known_hosts" -o StrictHostKeyChecking=accept-new "ubuntu@$(ip)" "$@"; }
 
 wait_for_bootstrap() {
@@ -28,7 +28,7 @@ commands:
   auth      read a Claude token (`claude setup-token`) from stdin and give it to the VM's T3
   ssh       open a shell on the VM
   status    show Terraform outputs and the VM's T3 status
-  down      delete the VM, keep the volume, floating IP and key pair
+  down      delete the VM, keep the data volume, key and firewall
   destroy   delete everything, the data volume included
 EOF
   exit 2

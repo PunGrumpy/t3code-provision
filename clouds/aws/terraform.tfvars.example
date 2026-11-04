@@ -1,0 +1,2 @@
+# Copy to terraform.tfvars. Authenticate with AWS_PROFILE or `aws sso login` first.
+ssh_cidrs = ["203.0.113.10/32"]

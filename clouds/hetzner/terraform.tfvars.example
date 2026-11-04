@@ -1,0 +1,3 @@
+# Copy to terraform.tfvars. Export HCLOUD_TOKEN from a read-write API token of the project.
+server_type = "cpx31"
+ssh_cidrs   = ["203.0.113.10/32"]

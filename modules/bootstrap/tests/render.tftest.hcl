@@ -2,6 +2,7 @@ variables {
   data_device         = "/dev/disk/by-id/virtio-0123456789abcdef0123"
   t3_channel          = "nightly"
   policy_organization = "acme \"ops\""
+  ssh_public_key      = "ssh-ed25519 AAAAC3Nza test@host\n"
 }
 
 run "renders_valid_cloud_config" {
@@ -15,6 +16,16 @@ run "renders_valid_cloud_config" {
   assert {
     condition     = yamldecode(output.user_data).fs_setup[0].device == var.data_device
     error_message = "fs_setup formats a different disk than the one passed in"
+  }
+
+  assert {
+    condition     = strcontains(yamldecode(output.user_data).bootcmd[0], "[ -e ${var.data_device} ]")
+    error_message = "bootcmd must wait for the same disk fs_setup formats"
+  }
+
+  assert {
+    condition     = yamldecode(output.user_data).users[1].name == "ubuntu" && yamldecode(output.user_data).users[1].ssh_authorized_keys == ["ssh-ed25519 AAAAC3Nza test@host"]
+    error_message = "without an explicit ubuntu user holding the key, su -l ubuntu and t3env ssh fail on root-only images"
   }
 
   assert {

@@ -5,7 +5,7 @@ Terraform for one cloud VM that runs T3 Code as a linked environment, so agents 
 ## Layout
 
 - `modules/bootstrap` renders the cloud-init every cloud shares. Its one cloud-specific input is the data volume's `/dev/disk/by-*` path inside the guest.
-- `clouds/<name>` is one Terraform root per provider: the VM, a persistent data volume, a public IP, a key pair and an SSH-only firewall. `clouds/nipa` is NIPA Cloud on OpenStack.
+- `clouds/<name>` is one Terraform root per provider: the VM, a persistent data volume, a key pair and an SSH-only firewall. NIPA keeps one floating IP; Hetzner and AWS give the VM a new public IP on each `up`. `clouds/nipa` is NIPA Cloud on OpenStack, `clouds/hetzner` is Hetzner Cloud and `clouds/aws` is EC2 in the default VPC.
 - The cloud-init mounts the volume at `/srv/t3`, links `~/.t3`, `~/.claude`, `~/.codex`, `~/.config/gh` and `~/workspace` into it, installs `t3`, Claude Code and Docker, and writes the two files below.
 - `/etc/t3code/policy.json` is a T3 Code managed policy that turns on Linked environments. Without it the VM refuses every link until someone flips Settings > Labs for it.
 - `~/.config/systemd/user/t3code.service.d/provider-env.conf` loads `~/.t3/provider.env` into the T3 service. `t3 up` rewrites the service unit, so the credentials ride in a drop-in instead.
@@ -13,11 +13,23 @@ Terraform for one cloud VM that runs T3 Code as a linked environment, so agents 
 
 ## Prerequisites
 
+Every cloud needs `clouds/<name>/terraform.tfvars`, copied from its example, and `t3_channel` set to the release train of the machine you link from (`t3 --version` there). It defaults to `stable`.
+
 For `clouds/nipa`:
 
 - A working `ncp-devops` entry in `~/.config/openstack/clouds.yaml` with its application credential in `secure.yaml`. Terraform reads it through `cloud = "ncp-devops"`, so no secret goes into tfvars or state. Check it with `OS_CLOUD=ncp-devops openstack token issue`.
 - `clouds/nipa/terraform.tfvars`, copied from the example, with real image, network and floating IP pool names from `openstack image list`, `openstack network list` and `openstack network list --external`.
-- `t3_channel` set to the release train of the machine you link from (`t3 --version` there). It defaults to `stable`.
+
+For `clouds/hetzner`:
+
+- `HCLOUD_TOKEN` exported from a read-write API token of the project.
+- A `server_type` sold in your `location` (default `sin`), from `hcloud server-type list`.
+- Your public key not already uploaded to the project. Hetzner refuses a second key with the same fingerprint, so delete the old one or point `ssh_public_key_path` at another key.
+
+For `clouds/aws`:
+
+- AWS credentials in the usual chain (`AWS_PROFILE`, `aws sso login` or env) and a default VPC in `region`.
+- A Nitro `instance_type` (the default `t3.xlarge` is one). cloud-init finds the data volume by its NVMe serial, which older Xen types do not expose.
 
 ## Lifecycle
 
@@ -38,7 +50,7 @@ After `down` and `up`, cloud-init reinstalls the T3 service from the volume's si
 ## Security
 
 - Every process T3 starts inherits `CLAUDE_CODE_OAUTH_TOKEN`, including the builds and tests of the repos you delegate, and `ubuntu` is in the `docker` group. Run only repos you trust here, and revoke the token from your Claude account if the VM is compromised.
-- `up` forgets the VM's SSH host key and trusts the first one it sees, because each new VM brings a new key on the same floating IP. Compare it with `openstack console log show` if the network path is not yours.
+- `up` forgets the VM's SSH host key and trusts the first one it sees, because each new VM brings a new key. Compare it with the console log (`openstack console log show`, `hcloud server request-console`, `aws ec2 get-console-output`) if the network path is not yours.
 
 ## Tests
 
@@ -60,7 +72,9 @@ On an existing Ubuntu 24.04 VM with T3 Code 0.1.7-nightly and cloud-init 26.1, s
 ## Not verified yet
 
 - A recreated VM reusing the volume's T3 Connect sign-in. The test reinstalled the service on the same machine, with the same machine-id and host key.
-
+- `clouds/hetzner` and `clouds/aws` have passed `validate` and their mock-provider tests only. No server has been created on either.
+- On Hetzner and AWS the public IP changes on every `up`. T3 Connect does not care, and `up` resets the SSH host key file.
+- That Hetzner's image accepts the explicit `ubuntu` user. Check `/home/ubuntu/.ssh/authorized_keys` on the first `up`.
 - Flavor `csa.xlarge.v2` and zone `NCP-BKK` come from NIPA's public pages, not from the API.
 - No `plan` or `apply` has run against NIPA, because the `ncp-devops` credential returns 401.
 - `up` right after `down` can fail while Cinder still reports the volume as detaching. Wait a minute and rerun.
